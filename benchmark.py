@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 # =========================
 # 1) 경로/설정: 폴더에 *.mp4와 동일 스템의 *.xml이 있다고 가정
 # =========================
-DATA_DIR = "/content/dataset"  # ✅ 여기에 본인 업로드 폴더 경로만 바꿔주세요
+DATA_DIR = "/content/datasets"  # ✅ 데이터셋 경로
 SAMPLE_FPS = 5  # 프레임 샘플링 속도
 CONF = 0.25  # 검출 신뢰도 임계치
 IMGZ = 640  # 추론 입력 크기
@@ -240,7 +240,7 @@ plt.figure(figsize=(6, 3.5))
 plt.bar(avg_scores.keys(), avg_scores.values());
 plt.ylim(0, 1)
 plt.ylabel("Avg F1-score")
-plt.title("Human detection (Avg F1 over dataset)")
+plt.title("Human detection (Avg F1 over datasets)")
 for i, (k, v) in enumerate(avg_scores.items()):
     plt.text(i, v + 0.02, f"{v:.3f}", ha='center')
 plt.xticks(rotation=10);
