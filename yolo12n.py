@@ -84,7 +84,6 @@ def get_pred(
         if getattr(r, "boxes", None) is None:
             continue
 
-        # Convert tensors to CPU numpy/python
         boxes_xyxy = r.boxes.xyxy.cpu().numpy()
         confs = r.boxes.conf.cpu().numpy()
         clses = r.boxes.cls.cpu().numpy().astype(int)
