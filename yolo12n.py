@@ -8,7 +8,7 @@ from ultralytics import YOLO
 import shutil
 
 root_dir = "/content"
-yolo12n = YOLO("yolo12n.pt")
+yolo12n = YOLO("sample/yolo12n.pt")
 
 
 def xywh_to_xyxy(box_xywh: List[float]) -> List[float]:
@@ -161,7 +161,7 @@ def get_f1_score(
 
 def extract_human_img():
     gt = get_gt_by_img()
-    img_dir = '/Users/jihunjang/workspace/ust/human-detection/datasets/coco/val2017/'
+    img_dir = '/datasets/coco/val2017/'
     listdir = os.listdir(img_dir)
     for f in listdir:
         img_id = get_image_id_from_path(f)
