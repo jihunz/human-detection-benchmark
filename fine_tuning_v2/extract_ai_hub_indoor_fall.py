@@ -47,7 +47,7 @@ VIDEO_ROOT = '/Users/jihunjang/Downloads/실내 사람 이�
 XML_ROOT   = '/Users/jihunjang/Downloads/실내 사람 이상행동 데이터/01-1.정식개방데이터/Training/02.라벨링데이터/TL_03.이상행동_07.전도'  # 예: "/path/to/xmls"
 
 # 출력 루트
-OUT_DIR    = "fine_tuning_v2/_fall_frame_dataset"
+OUT_DIR    = "train/_fall_frame_dataset"
 
 # 라벨 클래스 id (기본 0=person)
 CLASS_ID   = 0

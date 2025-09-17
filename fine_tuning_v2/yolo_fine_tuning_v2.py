@@ -38,11 +38,11 @@ from ultralytics import YOLO
 
 # ================== [User Config] ==================
 # Sources (produced by previous scripts)
-AIHUB_ROOT   = Path("fine_tuning_v2/_fall_frame_dataset")           # has images/, labels/
-CAUCA_ROOT   = Path("fine_tuning_v2/_caucafall_last_frames")        # flat png+txt pairs
+AIHUB_ROOT   = Path("train/_fall_frame_dataset")           # has images/, labels/
+CAUCA_ROOT   = Path("train/_caucafall_last_frames")        # flat png+txt pairs
 
 # Combined dataset output (will be created)
-COMBINED_ROOT = Path("fine_tuning_v2/_mix_dataset")                 # images/, labels/, _lists/
+COMBINED_ROOT = Path("train/_mix_dataset")                 # images/, labels/, _lists/
 
 # Training config
 VAL_RATIO   = 0.2
