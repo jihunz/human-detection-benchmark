@@ -42,7 +42,7 @@ def iter_fall_images(root: Path):
         for sub in sorted(subj.rglob("*")):
             if not sub.is_dir():
                 continue
-            if "fall" not in sub.name.lower():   # 'Fall' 포함 폴더만
+            if "class_fall" not in sub.name.lower():   # 'Fall' 포함 폴더만
                 continue
             for img in sorted(sub.glob("*")):
                 if img.suffix.lower() in IMG_EXTS:

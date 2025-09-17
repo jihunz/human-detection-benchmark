@@ -38,8 +38,8 @@ from ultralytics import YOLO
 
 # ================== [User Config] ==================
 # Sources (produced by previous scripts)
-AIHUB_ROOT   = Path("train/_fall_frame_dataset")           # has images/, labels/
-CAUCA_ROOT   = Path("train/_caucafall_last_frames")        # flat png+txt pairs
+AIHUB_ROOT   = Path("train/class_person/ai_hub_db")           # has images/, labels/
+CAUCA_ROOT   = Path("train/class_person/cauca_db")        # flat png+txt pairs
 
 # Combined dataset output (will be created)
 COMBINED_ROOT = Path("train/_mix_dataset")                 # images/, labels/, _lists/

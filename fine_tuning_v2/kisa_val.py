@@ -1,19 +1,21 @@
-"""Evaluate YOLO12n baseline and fine-tuned weights on KISA val subsets.
+"""Evaluate 파인튜닝 YOLO12n(class_fall 클래스 포함) 모델을 KISA val 서브셋에서 검증.
 
-Two subsets are evaluated separately:
-  - `val/person`: images representing normal human presence
-  - `val/fall`: images representing fall events
+서브셋별 평가 대상:
+  - `val/person`: 라벨 클래스 0 (person)
+  - `val/class_fall`: 라벨 클래스 80 (class_fall)
 
-For each subset the script rebuilds a temporary YOLO-style dataset, runs
-`model.val()` for both baseline YOLO12n and the fine-tuned checkpoint, prints
-metrics, and produces professional visualizations comparing Precision/Recall/F1
-across subsets and models.
+각 서브셋을 단일 클래스(0)로 정규화한 임시 평가 세트를 생성하고,
+YOLO12n 기본 가중치와 class_fall 클래스로 파인튜닝된 가중치를 모두 평가한다.
+Precision/Recall/F1/mAP 지표를 비교 그래프로 시각화하고 JSON 리포트로 저장한다.
 """
 from __future__ import annotations
 
 import os
 import shutil
 from dataclasses import dataclass
+from datetime import datetime
+import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
@@ -29,22 +31,35 @@ import matplotlib.pyplot as plt
 BASE_DIR = Path("/Users/jihunjang/workspace/ust/human-detection/fine_tuning_v2")
 DATASET_ROOT = BASE_DIR / "val"
 TMP_EVAL_ROOT = DATASET_ROOT / "_eval_dataset"
-PLOT_PATH = TMP_EVAL_ROOT / "kisa_eval_metrics.png"
 BASELINE_WEIGHTS = "yolo12n.pt"
-FINETUNED_WEIGHTS = BASE_DIR / "runs/detect/train/weights/best.pt"
+FINETUNED_WEIGHTS = BASE_DIR / "runs/detect/02/train2/weights/last.pt"
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
 IMG_SIZE = 640
 WORKERS = 2
 MODEL_NAMES = ["YOLO12n (base)", "YOLO12n (finetuned)"]
+BENCHMARK_ROOT = BASE_DIR / "benchmark"
 SUBSETS = {
-    "person": DATASET_ROOT / "person",
-    "fall": DATASET_ROOT / "fall",
+    "person": {
+        "path": DATASET_ROOT / "person",
+        "src_class": 0,
+        "ft_class": 0,
+        "base_class": 0,
+        "label_name": "person",
+    },
+    "class_fall": {
+        "path": DATASET_ROOT / "class_fall",
+        "src_class": 80,
+        "ft_class": 80,
+        "base_class": 0,
+        "label_name": "class_fall",
+    },
 }
 
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 DEVICE = "mps" if torch.backends.mps.is_available() else (
     "cuda" if torch.cuda.is_available() else "cpu"
 )
+
 
 
 @dataclass
@@ -86,7 +101,36 @@ def safe_link_or_copy(src: Path, dst: Path) -> None:
     shutil.copy2(src, dst)
 
 
-def rebuild_eval_dataset(samples: Iterable[Sample], out_root: Path) -> List[Path]:
+
+def rewrite_label_single_class(src: Path, dst: Path, src_class: int, target_class: int) -> None:
+    """라벨 파일에서 지정 클래스만 남기고 id를 target_class로 치환."""
+    lines_out: List[str] = []
+    with src.open("r", encoding="utf-8") as f:
+        for line in f:
+            parts = line.strip().split()
+            if not parts:
+                continue
+            try:
+                cls_id = int(float(parts[0]))
+            except ValueError:
+                continue
+            if cls_id != src_class:
+                continue
+            parts[0] = str(target_class)
+            lines_out.append(" ".join(parts))
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if not lines_out:
+        # 대상 클래스가 없으면 빈 파일로 저장하여 무라벨 처리
+        with dst.open("w", encoding="utf-8") as f:
+            f.write("")
+        return
+
+    with dst.open("w", encoding="utf-8") as f:
+        f.write("\n".join(lines_out) + "\n")
+
+
+def rebuild_eval_dataset(samples: Iterable[Sample], out_root: Path, src_class: int, target_class: int) -> List[Path]:
     if out_root.exists():
         shutil.rmtree(out_root)
     images_dir = out_root / "images"
@@ -99,7 +143,7 @@ def rebuild_eval_dataset(samples: Iterable[Sample], out_root: Path) -> List[Path
         dst_img = images_dir / sample.image.name
         dst_lbl = labels_dir / sample.label.name
         safe_link_or_copy(sample.image, dst_img)
-        shutil.copy2(sample.label, dst_lbl)
+        rewrite_label_single_class(sample.label, dst_lbl, src_class, target_class)
         collected.append(dst_img)
     return collected
 
@@ -111,17 +155,47 @@ def write_list_file(paths: Iterable[Path], out_file: Path) -> None:
             f.write(str(p.resolve()) + "\n")
 
 
-def make_data_yaml(root: Path, list_file: Path) -> Path:
+
+
+@lru_cache(None)
+def load_base_names() -> Dict[int, str]:
+    model = YOLO(str(BASELINE_WEIGHTS))
+    names = getattr(model.model, "names", None)
+    if names is None and hasattr(model, "names"):
+        names = model.names
+    if isinstance(names, dict):
+        return {int(k): v for k, v in names.items()}
+    return {i: n for i, n in enumerate(names)}
+
+
+def make_data_yaml(root: Path, list_file: Path, target_class: int, label_name: str) -> Path:
+    base_names = load_base_names().copy()
+    for idx in range(target_class + 1):
+        base_names.setdefault(idx, f"class_{idx}")
+    base_names[target_class] = label_name
+    names = {idx: base_names[idx] for idx in range(target_class + 1)}
     data = {
         "path": str(root.resolve()),
         "train": str(list_file.resolve()),
         "val": str(list_file.resolve()),
-        "names": {0: "person"},
+        "names": names,
     }
     out = root / "data.auto.yaml"
     with out.open("w") as f:
         yaml.safe_dump(data, f, sort_keys=False)
     return out
+
+
+def prepare_benchmark_dir() -> Path:
+    BENCHMARK_ROOT.mkdir(parents=True, exist_ok=True)
+    date_str = datetime.now().strftime("%Y%m%d")
+    target = BENCHMARK_ROOT / date_str
+    idx = 1
+    while target.exists():
+        idx += 1
+        target = BENCHMARK_ROOT / f"{date_str}_{idx:02d}"
+    target.mkdir(parents=True, exist_ok=True)
+    return target
 
 
 def f1_score(precision: float, recall: float) -> float:
@@ -157,11 +231,10 @@ def evaluate(weights: Path | str, data_yaml: Path) -> Dict[str, float]:
     }
 
 
-def visualize_results(results: Dict[str, Dict[str, Dict[str, float]]]) -> None:
+def visualize_results(results: Dict[str, Dict[str, Dict[str, float]]], plot_path: Path) -> None:
     if not results:
         return
 
-    TMP_EVAL_ROOT.mkdir(parents=True, exist_ok=True)
     subsets = list(results.keys())
     metrics_to_plot = ["precision", "recall", "f1", "map50"]
     metric_titles = {
@@ -182,7 +255,7 @@ def visualize_results(results: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             "axes.spines.top": False,
             "axes.spines.right": False,
             "axes.titleweight": "semibold",
-            "figure.dpi": 160,
+            "figure.dpi": 170,
         }
     )
 
@@ -214,9 +287,11 @@ def visualize_results(results: Dict[str, Dict[str, Dict[str, float]]]) -> None:
 
     fig.suptitle("KISA Validation Metrics", fontsize=16, fontweight="bold")
     fig.legend(MODEL_NAMES, loc="upper center", bbox_to_anchor=(0.5, 0.02), ncol=len(MODEL_NAMES))
-    fig.savefig(PLOT_PATH, dpi=300, bbox_inches="tight")
+    fig.savefig(plot_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"[Plot] Saved metric comparison to {PLOT_PATH}")
+    print(f"[Plot] Saved metric comparison to {plot_path}")
+
+
 
 
 def summarize(results: Dict[str, Dict[str, Dict[str, float]]]) -> None:
@@ -233,20 +308,24 @@ def summarize(results: Dict[str, Dict[str, Dict[str, float]]]) -> None:
                 f"Precision: {metrics['precision']:.4f} | Recall: {metrics['recall']:.4f} | "
                 f"mAP50: {metrics['map50']:.4f}"
             )
-    all_pairs = [
-        (subset, model, metrics["f1"])
-        for subset, subset_metrics in results.items()
-        for model, metrics in subset_metrics.items()
-    ]
-    if all_pairs:
-        best_subset, best_model, best_f1 = max(all_pairs, key=lambda x: x[2])
-        print(f"\nBest F1: {best_model} on {best_subset} ({best_f1:.4f})")
+
+    best_subset, best_model, best_metrics = max(
+        (
+            (subset, model_name, metrics)
+            for subset, subset_metrics in results.items()
+            for model_name, metrics in subset_metrics.items()
+        ),
+        key=lambda item: item[2]["f1"],
+    )
+    print(f"\nBest F1: {best_model} on {best_subset} ({best_metrics['f1']:.4f})")
+
 
 
 def main() -> None:
     results: Dict[str, Dict[str, Dict[str, float]]] = {}
 
-    for subset_name, subset_path in SUBSETS.items():
+    for subset_name, subset_cfg in SUBSETS.items():
+        subset_path = subset_cfg["path"]
         samples = collect_samples(subset_path)
         if not samples:
             print(f"[skip] No labeled samples found for subset '{subset_name}'")
@@ -254,21 +333,39 @@ def main() -> None:
         print(f"\n[Build] Subset '{subset_name}': {len(samples)} labeled images")
 
         subset_eval_root = TMP_EVAL_ROOT / subset_name
-        img_paths = rebuild_eval_dataset(samples, subset_eval_root)
+        img_paths = rebuild_eval_dataset(samples, subset_eval_root, subset_cfg["src_class"], subset_cfg["ft_class"])
         lists_dir = subset_eval_root / "_lists"
         val_txt = lists_dir / "val.txt"
         write_list_file(img_paths, val_txt)
-        data_yaml = make_data_yaml(subset_eval_root, val_txt)
-        print(f"[YAML] {data_yaml}")
+        data_yaml_ft = make_data_yaml(subset_eval_root, val_txt, subset_cfg["ft_class"], subset_cfg["label_name"])
+        print(f"[YAML] {data_yaml_ft}")
+
+        if subset_name == "class_fall":
+            base_eval_root = TMP_EVAL_ROOT / "class_fall-yolo12-base"
+            base_img_paths = rebuild_eval_dataset(samples, base_eval_root, subset_cfg["src_class"], subset_cfg["base_class"])
+            base_lists_dir = base_eval_root / "_lists"
+            base_val_txt = base_lists_dir / "val.txt"
+            write_list_file(base_img_paths, base_val_txt)
+            data_yaml_base = make_data_yaml(base_eval_root, base_val_txt, subset_cfg["base_class"], "person")
+        else:
+            data_yaml_base = data_yaml_ft
 
         subset_results: Dict[str, Dict[str, float]] = {}
-        subset_results[MODEL_NAMES[0]] = evaluate(BASELINE_WEIGHTS, data_yaml)
+        subset_results[MODEL_NAMES[0]] = evaluate(BASELINE_WEIGHTS, data_yaml_base)
         assert FINETUNED_WEIGHTS.exists(), f"Fine-tuned weights not found: {FINETUNED_WEIGHTS}"
-        subset_results[MODEL_NAMES[1]] = evaluate(FINETUNED_WEIGHTS, data_yaml)
+        subset_results[MODEL_NAMES[1]] = evaluate(FINETUNED_WEIGHTS, data_yaml_ft)
         results[subset_name] = subset_results
 
     summarize(results)
-    visualize_results(results)
+
+    bench_dir = prepare_benchmark_dir()
+    plot_path = bench_dir / "kisa_eval_metrics.png"
+    visualize_results(results, plot_path)
+
+    metrics_path = bench_dir / "metrics.json"
+    with metrics_path.open("w", encoding="utf-8") as f:
+        json.dump({"models": MODEL_NAMES, "results": results}, f, ensure_ascii=False, indent=2)
+    print(f"[Benchmark] Saved metrics to {metrics_path}")
 
 
 if __name__ == "__main__":
