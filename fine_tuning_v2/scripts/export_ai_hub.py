@@ -79,42 +79,51 @@ def write_label(label_path: Path, entries: List[Tuple[float, float, float, float
             f.write(f"{FALL_CLASS_ID} {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}\n")
 
 
-def grab_frame(video_path: Path, frame_idx: int) -> Tuple[bool, Any]:
+def grab_frame(video_path: Path, frame_idx: int) -> Tuple[bool, Any, int]:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
-        return False, None
+        return False, None, frame_idx
 
-    if frame_idx > 0:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    target_idx = frame_idx
+    if total_frames > 0:
+        target_idx = max(0, min(frame_idx, total_frames - 1))
+
+    if target_idx > 0:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, target_idx)
     success, frame = cap.read()
 
     if not success or frame is None:
         cap.release()
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
-            return False, None
+            return False, None, target_idx
         success = False
-        for _ in range(frame_idx + 1):
+        for _ in range(target_idx + 1):
             success, frame = cap.read()
             if not success or frame is None:
                 break
         if not success or frame is None:
             cap.release()
-            return False, None
+            return False, None, target_idx
 
     cap.release()
-    return True, frame
+    return True, frame, target_idx
 
 
 def process_video(video_path: Path, frame_idx: int, boxes: List[Box], stem: str) -> Tuple[int, int]:
-    success, frame = grab_frame(video_path, frame_idx)
+    success, frame, actual_idx = grab_frame(video_path, frame_idx)
     if not success or frame is None:
         print(f"[warn] Could not read frame {frame_idx} from {video_path.name}")
         return (0, 1)
+    if actual_idx != frame_idx:
+        print(
+            f"[info] Adjusted frame index {frame_idx} -> {actual_idx} for {video_path.name}"
+        )
 
     height, width = frame.shape[:2]
     yolo_boxes = [convert_to_yolo(box, width, height) for box in boxes]
-    image_name = f"{stem}_frame_{frame_idx:05d}.jpg"
+    image_name = f"{stem}_frame_{actual_idx:05d}.jpg"
     label_name = image_name.replace(".jpg", ".txt")
     image_path = OUTPUT_IMAGES / image_name
     label_path = OUTPUT_LABELS / label_name
