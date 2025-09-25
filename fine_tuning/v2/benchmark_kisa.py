@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 # ---------------------------
 # Configuration
 # ---------------------------
-BASE_DIR = Path("/Users/jihunjang/workspace/ust/human-detection/fine_tuning_v2")
+BASE_DIR = Path("/v2")
 DATASET_ROOT = BASE_DIR / "val"
 TMP_EVAL_ROOT = DATASET_ROOT / "_eval_dataset"
 BASELINE_WEIGHTS = "yolo12n.pt"

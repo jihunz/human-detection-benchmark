@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 # ====== 사용자 입력 ======
 DATASET_ROOT = Path('/Users/jihunjang/Downloads/Dataset CAUCAFall/CAUCAFall')           # 예: "/Users/me/datasets/CAUCAFall"
 BASELINE_W   = "yolo12n.pt"                          # 베이스(없으면 자동 다운로드)
-FINETUNED_W  = Path('/fine_tuning_v1/runs/detect/train/weights/best.pt')
+FINETUNED_W  = Path('/v1/runs/detect/train/weights/best.pt')
 
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
 TMP_EVAL_ROOT = DATASET_ROOT / "_eval_fall_person_swapped"  # 임시 평가셋 생성 위치

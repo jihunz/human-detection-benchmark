@@ -3,13 +3,13 @@
 Steps
 -----
 1. Combine fall validation sources into a fresh evaluation dataset under
-   `fine_tuning_v2/val/<date>/{fall,fall_base,person}`.
+   `v2/val/<date>/{fall,fall_base,person}`.
 2. Remap fall labels to class 80 for the fine-tuned model and to class 0 for the
    base model.
 3. Run Ultralytics `model.val` on both fall/person subsets for
    - fine-tuned weights (expects fall at class id 80)
    - baseline YOLO12n weights (expects standard COCO 80 classes)
-4. Store metrics and plots in `fine_tuning_v2/benchmark/<date>`.
+4. Store metrics and plots in `v2/benchmark/<date>`.
 """
 from __future__ import annotations
 
