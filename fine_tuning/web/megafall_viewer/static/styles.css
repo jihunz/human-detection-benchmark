@@ -29,6 +29,49 @@ body {
     pointer-events: none;
 }
 
+.loading {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    transition: opacity 0.2s ease;
+}
+
+.loading.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-card {
+    background: #ffffff;
+    padding: 20px 24px;
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+    min-width: 260px;
+    text-align: center;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.loading-bar {
+    width: 100%;
+    height: 10px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    margin-top: 12px;
+    overflow: hidden;
+}
+
+.loading-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #38bdf8);
+    border-radius: 999px;
+    transition: width 0.18s ease;
+}
+
 .container, .viewer-container {
     max-width: 960px;
     margin: 0 auto;
@@ -116,6 +159,8 @@ h1 {
     display: flex;
     justify-content: space-between;
     margin: 18px 0;
+    flex-wrap: wrap;
+    gap: 16px;
 }
 
 .controls button {
@@ -164,6 +209,30 @@ h1 {
 
 .nav-buttons, .action-buttons {
     display: flex;
+}
+
+.nav-buttons button {
+    margin-right: 8px;
+}
+
+.filter-control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 220px;
+}
+
+#class-filter {
+    padding: 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 14px;
+    min-height: 160px;
+}
+
+.filter-control small {
+    color: #475569;
+    font-size: 12px;
 }
 
 @media (max-width: 720px) {

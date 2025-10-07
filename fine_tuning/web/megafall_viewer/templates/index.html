@@ -8,8 +8,16 @@
 </head>
 <body>
     <div id="toast" class="toast hidden"></div>
+    <div id="loading-overlay" class="loading hidden">
+        <div class="loading-card">
+            <p>Preparing viewer… <span id="loading-percent">1%</span></p>
+            <div class="loading-bar">
+                <div class="loading-progress" id="loading-progress" style="width:1%"></div>
+            </div>
+        </div>
+    </div>
     <main class="container">
-        <h1>MegaFall Dataset Viewer</h1>
+        <h1>Vision Dataset Viewer</h1>
         <form action="/viewer" method="get" class="path-form" id="path-form">
             <label>
                 Image directory
@@ -31,6 +39,82 @@
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 5000);
         }
+
+        const form = document.getElementById('path-form');
+        const overlay = document.getElementById('loading-overlay');
+        const progressBar = document.getElementById('loading-progress');
+        const percentText = document.getElementById('loading-percent');
+        let eventSource;
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = type === 'error' ? 'rgba(220, 38, 38, 0.95)' : 'rgba(15, 118, 110, 0.95)';
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 4000);
+        }
+
+        function resetProgress() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            progressBar.style.width = '0%';
+            percentText.textContent = '0%';
+        }
+
+        form.addEventListener('submit', (ev) => {
+            ev.preventDefault();
+            resetProgress();
+            const imgDir = form.img_dir.value.trim();
+            const labelDir = form.label_dir.value.trim();
+            if (!imgDir || !labelDir) {
+                return;
+            }
+            overlay.classList.remove('hidden');
+
+            const params = new URLSearchParams({ img_dir: imgDir, label_dir: labelDir });
+            eventSource = new EventSource(`/api/progress?${params.toString()}`);
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.status === 'progress') {
+                    progressBar.style.width = `${data.progress}%`;
+                    const etaTxt = data.eta != null ? ` (ETA ${data.eta}s)` : '';
+                    percentText.textContent = `${data.progress}%${etaTxt}`;
+                } else if (data.status === 'done') {
+                    progressBar.style.width = '100%';
+                    percentText.textContent = `100% (elapsed ${data.elapsed}s)`; 
+                    eventSource.close();
+                    eventSource = null;
+                    setTimeout(() => {
+                        window.location.href = data.viewer_url;
+                    }, 200);
+                } else if (data.status === 'error') {
+                    showToast(data.message, 'error');
+                    overlay.classList.add('hidden');
+                    eventSource.close();
+                    eventSource = null;
+                }
+            };
+
+            eventSource.onerror = () => {
+                showToast('Connection lost while preparing viewer', 'error');
+                overlay.classList.add('hidden');
+                if (eventSource) eventSource.close();
+                eventSource = null;
+            };
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+            if (progressBar) {
+                progressBar.style.width = '100%';
+                percentText.textContent = '100%';
+            }
+        });
     </script>
 </body>
 </html>
