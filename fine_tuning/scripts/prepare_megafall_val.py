@@ -7,7 +7,7 @@ from typing import Iterable
 from PIL import Image
 
 IMAGE_ROOT = Path("/Users/jihunjang/Downloads/dataset/train/megafallv2/images/test")
-LABEL_ROOT = Path("/Users/jihunjang/Downloads/dataset/train/megafallv2/labels/test")
+LABEL_ROOT = Path("/Users/jihunjang/Downloads/dataset/train/megafallv2/labels/test_unnormalized")
 OUTPUT_ROOT = LABEL_ROOT.parent / "normalized_test"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -40,10 +40,19 @@ def normalize_bbox(bbox: Iterable[float], width: int, height: int) -> tuple[floa
     )
 
     if not normalized:
-        xc /= width
-        yc /= height
-        w /= width
-        h /= height
+        # detect absolute top-left format (x, y, width, height)
+        if xc >= 0 and yc >= 0 and w > 0 and h > 0 and xc + w / 2 <= width * 1.5 and yc + h / 2 <= height * 1.5:
+            x_center = xc + w / 2
+            y_center = yc + h / 2
+            xc = x_center / width
+            yc = y_center / height
+            w = w / width
+            h = h / height
+        else:
+            xc /= width
+            yc /= height
+            w /= width
+            h /= height
 
     return (
         max(0.0, min(1.0, xc)),
