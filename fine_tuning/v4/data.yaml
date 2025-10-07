@@ -1,0 +1,3 @@
+train: /Users/jihunjang/Downloads/dataset/train/megafallv2/images/train
+val: /Users/jihunjang/Downloads/dataset/train/megafallv2/images/test
+names: []

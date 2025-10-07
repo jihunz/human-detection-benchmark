@@ -1,0 +1,10 @@
+version: '3.9'
+services:
+  megafall-viewer:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - /Users/jihunjang/Downloads/dataset/train:/datasets:ro
+    environment:
+      - PYTHONPATH=/app

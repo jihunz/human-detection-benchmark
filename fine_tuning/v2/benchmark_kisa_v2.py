@@ -4,10 +4,10 @@ Steps
 -----
 1. Combine fall validation sources into a fresh evaluation dataset under
    `v2/val/<date>/{fall,fall_base,person}`.
-2. Remap fall labels to class 80 for the fine-tuned model and to class 0 for the
+2. Remap fall labels to class 1 for the fine-tuned model and to class 0 for the
    base model.
 3. Run Ultralytics `model.val` on both fall/person subsets for
-   - fine-tuned weights (expects fall at class id 80)
+   - fine-tuned weights (expects fall at class id 1)
    - baseline YOLO12n weights (expects standard COCO 80 classes)
 4. Store metrics and plots in `v2/benchmark/<date>`.
 """
@@ -24,6 +24,12 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from math import ceil
+
+FONT_FAMILY = "DejaVu Sans"
+plt.rcParams["font.family"] = FONT_FAMILY
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
 from ultralytics import YOLO
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -36,13 +42,13 @@ FALL_SOURCES = [
         "name": "kisa_fall",
         "images": Path("/Users/jihunjang/Downloads/dataset/val/kisa-fall/images"),
         "labels": Path("/Users/jihunjang/Downloads/dataset/val/kisa-fall/labels"),
-        "target_class": 80,
+        "target_class": 1,
     },
     {
         "name": "kisa2_fall",
-        "images": Path("/Users/jihunjang/Downloads/dataset/val/kisa-2-fall-only/images"),
-        "labels": Path("/Users/jihunjang/Downloads/dataset/val/kisa-2-fall-only/labels"),
-        "target_class": 80,
+        "images": Path("/Users/jihunjang/Downloads/dataset/val/kisa-2-img/images"),
+        "labels": Path("/Users/jihunjang/Downloads/dataset/val/kisa-2-img/labels"),
+        "target_class": 1,
     },
 ]
 PERSON_SOURCE = {
@@ -52,8 +58,8 @@ PERSON_SOURCE = {
     "target_class": 0,
 }
 
-NEW_WEIGHTS = BASE_DIR / "runs/detect/fall_adapter/weights/best.pt"
-BASE_WEIGHTS = BASE_DIR / "yolo12n.pt"
+NEW_WEIGHTS = BASE_DIR / "/Users/jihunjang/workspace/ust/human-detection/fine_tuning/v3/result/train2/weights/best.pt"
+BASE_WEIGHTS = BASE_DIR / "../yolo12n.pt"
 
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 LBL_EXT = ".txt"
@@ -269,15 +275,17 @@ def evaluate_model(model_tag: str, weights: Path, subset_keys: Dict[str, str], s
         mp = float(getattr(box_metrics, "mp", 0.0))
         mr = float(getattr(box_metrics, "mr", 0.0))
         map50 = float(getattr(box_metrics, "map50", 0.0))
+        map50_95 = float(getattr(box_metrics, "map", 0.0))
         f1 = 0.0 if (mp + mr) == 0 else 2 * mp * mr / (mp + mr)
         metrics_per_subset[logical_name] = {
             "precision": mp,
             "recall": mr,
             "f1": f1,
             "mAP50": map50,
+            "mAP50_95": map50_95,
         }
         print(
-            f"[{model_tag}] {logical_name}: P={mp:.4f} R={mr:.4f} F1={f1:.4f} mAP50={map50:.4f}"
+            f"[{model_tag}] {logical_name}: P={mp:.4f} R={mr:.4f} F1={f1:.4f} mAP50={map50:.4f} mAP50-95={map50_95:.4f}"
         )
     return metrics_per_subset
 
@@ -289,28 +297,42 @@ def prepare_benchmark_dir(base_name: str) -> Path:
 
 def plot_results(results: Dict[str, Dict[str, Dict[str, float]]], bench_dir: Path) -> Path:
     subsets = sorted({subset for model_res in results.values() for subset in model_res.keys()})
-    metrics = ["precision", "recall", "f1", "mAP50"]
+    metrics = [
+        ("precision", "Precision"),
+        ("recall", "Recall"),
+        ("f1", "F1"),
+        ("mAP50", "mAP@50"),
+        ("mAP50_95", "mAP@50-95"),
+    ]
     model_tags = list(results.keys())
 
-    fig, axes = plt.subplots(len(subsets), 1, figsize=(8.0, 3.2 * len(subsets)), constrained_layout=True)
-    if not isinstance(axes, np.ndarray):
-        axes = np.array([axes])
+    ncols = 2
+    nrows = ceil(len(metrics) / ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(10.0, 3.0 * nrows), constrained_layout=True)
+    axes = np.array(axes).reshape(-1)
 
-    x = np.arange(len(metrics))
-    width = 0.35
+    x = np.arange(len(subsets))
+    width = 0.35 if len(model_tags) > 1 else 0.5
 
-    for ax, subset in zip(axes, subsets):
+    for ax, (metric_key, metric_title) in zip(axes, metrics):
         for idx, model_tag in enumerate(model_tags):
-            values = [results[model_tag].get(subset, {}).get(metric, 0.0) for metric in metrics]
+            values = [results[model_tag].get(subset, {}).get(metric_key, 0.0) for subset in subsets]
             offset = width * (idx - (len(model_tags) - 1) / 2)
             ax.bar(x + offset, values, width=width, label=model_tag)
         ax.set_xticks(x)
-        ax.set_xticklabels(metrics, rotation=15)
+        ax.set_xticklabels(subsets, rotation=0, fontweight="bold", fontfamily=FONT_FAMILY)
         ax.set_ylim(0, 1.05)
-        ax.set_ylabel("Score")
-        ax.set_title(f"Subset: {subset}")
+        ax.set_ylabel(metric_title, fontweight="bold", fontfamily=FONT_FAMILY)
+        ax.set_title(metric_title, fontsize=12, fontweight="bold", fontfamily=FONT_FAMILY)
         ax.grid(axis="y", linestyle="--", alpha=0.5)
-        ax.legend()
+        legend = ax.legend(frameon=False, prop={"family": FONT_FAMILY, "weight": "bold"})
+        for label in ax.get_yticklabels():
+            label.set_fontfamily(FONT_FAMILY)
+            label.set_fontweight("semibold")
+        ax.tick_params(axis="y", labelsize=9, width=1.2)
+
+    for ax in axes[len(metrics):]:
+        ax.axis("off")
 
     plot_path = bench_dir / "benchmark_comparison.png"
     fig.suptitle("KISA Validation Benchmark", fontsize=14, fontweight="bold")
@@ -333,7 +355,7 @@ def main() -> None:
             "weights": BASE_WEIGHTS,
             "subsets": {"fall": "fall_base", "person": "person"},
         },
-        "fall_adapter": {
+        "ft_yolo12n": {
             "weights": NEW_WEIGHTS,
             "subsets": {"fall": "fall", "person": "person"},
         },

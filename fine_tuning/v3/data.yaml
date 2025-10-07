@@ -1,4 +1,6 @@
-path: /Users/jihunjang/Downloads/dataset/train/yolo 학습용-person 포함
-train: /path/images
-val: /path/val
-names: [person, fall]
+path: /Users/jihunjang/Downloads/dataset/train/yolo 학습용-person 포함-640px
+train: /Users/jihunjang/workspace/ust/human-detection/fine_tuning/v3/train.txt
+val: /Users/jihunjang/workspace/ust/human-detection/fine_tuning/v3/val.txt
+names:
+  0: person
+  1: fall

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MegaFall Viewer</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+    <div id="toast" class="toast hidden"></div>
+    <main class="viewer-container">
+        <header class="viewer-header">
+            <h1>MegaFall Viewer</h1>
+            <div class="meta">
+                <span id="counter"></span>
+                <span id="paths"></span>
+            </div>
+        </header>
+        <section class="canvas-wrapper">
+            <img id="display-image" alt="dataset frame" />
+            <canvas id="overlay"></canvas>
+        </section>
+        <section class="controls">
+            <div class="nav-buttons">
+                <button id="prev-btn" type="button">⟨ Prev</button>
+                <button id="next-btn" type="button">Next ⟩</button>
+            </div>
+            <div class="action-buttons">
+                <button id="exclude-btn" type="button">Exclude</button>
+                <button id="export-btn" type="button">Export</button>
+            </div>
+            <div class="filter-control">
+                <label for="class-filter">Visible classes</label>
+                <select id="class-filter" multiple size="6"></select>
+                <small>Hold Ctrl/⌘ to select multiple. Leave empty for all classes.</small>
+            </div>
+        </section>
+        <section class="info">
+            <h2>Label details</h2>
+            <ul id="label-list"></ul>
+        </section>
+        <section class="excluded">
+            <h2>Excluded items</h2>
+            <ul id="excluded-list"></ul>
+        </section>
+    </main>
+    <script>
+        window.viewerData = {{ data_json | safe }};
+    </script>
+    <script src="/static/viewer.js" defer></script>
+</body>
+</html>
