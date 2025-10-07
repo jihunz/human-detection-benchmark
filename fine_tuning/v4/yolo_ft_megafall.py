@@ -17,13 +17,13 @@ def run_train() -> None:
         imgsz=640,
         epochs=100,
         patience=20,
-        batch=8,
+        batch=-1, # 최대 배치 자동 탐색
         single_cls=False,
         freeze=10,
         lr0=1e-3,
         device='mps',
-        workers=4,
-        cache=True,
+        workers=12,
+        cache='ram',
         project=str(BASE_DIR / 'result'),
         verbose=True,
     )
